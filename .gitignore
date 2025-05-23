@@ -25,6 +25,7 @@ MANIFEST
 
 # Virtual environments
 venv/
+venv_py39/
 env/
 ENV/
 env.bak/
