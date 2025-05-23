@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  whisper-diarization:
+    build: .
+    container_name: whisper-pipeline
+    volumes:
+      # Монтируем локальную папку input в контейнер
+      - ./input:/app/input
+      # Монтируем локальную папку output в контейнер  
+      - ./output:/app/output
+    environment:
+      # HuggingFace токен (установите в .env файле или передайте через переменную среды)
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+    # Пример команды для запуска
+    # command: ["/app/input/audio.wav", "--model", "base", "--output", "/app/output"]
+    
+    # Для интерактивного режима
+    stdin_open: true
+    tty: true 
