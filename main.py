@@ -1135,7 +1135,7 @@ class AudioProcessor:
 
 
 @click.command()
-@click.argument('audio_file', type=click.Path(exists=True))
+@click.argument('audio_file')
 @click.option('--model', '-m', default='large', 
               type=click.Choice(['tiny', 'base', 'small', 'medium', 'large']),
               help='Модель Whisper для использования (только для стандартных моделей)')
@@ -1170,6 +1170,33 @@ def main(audio_file: str, model: str, custom_model: Optional[str], output: str, 
     
     AUDIO_FILE: Путь к аудиофайлу для обработки
     """
+    
+    # Проверяем и корректируем путь к аудиофайлу
+    input_dir = Path("input")
+    if input_dir.exists() and not Path(audio_file).exists():
+        # Ищем файл в input/ директории
+        input_file_path = input_dir / audio_file
+        if input_file_path.exists():
+            audio_file = str(input_file_path)
+        else:
+            print(f"❌ Файл не найден: {audio_file}")
+            print(f"🔍 Искал в: {Path(audio_file).absolute()}")
+            print(f"🔍 Искал в: {input_file_path.absolute()}")
+            
+            # Покажем доступные файлы в input/
+            if input_dir.exists():
+                input_files = list(input_dir.glob("*"))
+                if input_files:
+                    print(f"📁 Доступные файлы в input/:")
+                    for f in input_files:
+                        if f.is_file():
+                            print(f"   • {f.name}")
+                else:
+                    print(f"📁 Папка input/ пуста")
+            sys.exit(1)
+    elif not Path(audio_file).exists():
+        print(f"❌ Файл не найден: {audio_file}")
+        sys.exit(1)
     
     print("🎵 Whisper + PyAnnote Audio Pipeline (Улучшенная диаризация + Кастомные модели)")
     print(f"📁 Обрабатываем: {audio_file}")
