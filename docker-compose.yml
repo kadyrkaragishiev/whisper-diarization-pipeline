@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # NVIDIA GPU version
   whisper-diarization-gpu:

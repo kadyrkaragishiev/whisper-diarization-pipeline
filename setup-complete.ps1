@@ -71,8 +71,10 @@ if (Test-Path "install-docker.ps1") {
             & ".\install-docker.ps1"
         }
     } catch {
-        Write-ColorOutput "Error installing dependencies" "Red"
+        Write-ColorOutput "Error installing dependencies: $($_.Exception.Message)" "Red"
+        Write-ColorOutput "Detailed error: $($_.Exception)" "Yellow"
         Write-ColorOutput "Try installing Docker Desktop manually" "Yellow"
+        Write-ColorOutput "Download from: https://www.docker.com/products/docker-desktop" "Blue"
     }
 } else {
     Write-ColorOutput "File install-docker.ps1 not found" "Red"
