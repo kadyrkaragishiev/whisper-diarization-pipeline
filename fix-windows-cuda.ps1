@@ -15,9 +15,11 @@ function Write-ColorOutput {
         "Yellow" = "Yellow"
         "Blue" = "Cyan"
         "Purple" = "Magenta"
+        "White" = "White"
     }
     
-    Write-Host $Text -ForegroundColor $colors[$Color]
+    $actualColor = if ($colors.ContainsKey($Color)) { $colors[$Color] } else { "White" }
+    Write-Host $Text -ForegroundColor $actualColor
 }
 
 Write-ColorOutput "Whisper Diarization Pipeline - CUDA Fix" "Purple"

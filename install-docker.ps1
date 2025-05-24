@@ -22,9 +22,11 @@ function Write-ColorOutput {
         "Yellow" = "Yellow"
         "Blue" = "Cyan"
         "Purple" = "Magenta"
+        "White" = "White"
     }
     
-    Write-Host $Text -ForegroundColor $colors[$Color]
+    $actualColor = if ($colors.ContainsKey($Color)) { $colors[$Color] } else { "White" }
+    Write-Host $Text -ForegroundColor $actualColor
 }
 
 Write-ColorOutput "Docker and NVIDIA GPU Setup for Windows" "Blue"
@@ -193,9 +195,9 @@ if (-not (Test-Path ".env")) {
 }
 
 # Final instructions
-Write-ColorOutput "" "White"
+Write-Host ""
 Write-ColorOutput "Installation completed!" "Green"
-Write-ColorOutput "" "White"
+Write-Host ""
 
 if ($needReboot) {
     Write-ColorOutput "Computer reboot required" "Yellow"
@@ -215,5 +217,5 @@ if ($needReboot) {
     Write-ColorOutput "   3. Run: ./run.sh your_audio.wav" "Blue"
 }
 
-Write-ColorOutput "" "White"
+Write-Host ""
 Write-ColorOutput "Ready to use!" "Purple" 
