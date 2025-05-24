@@ -27,24 +27,24 @@ function Write-ColorOutput {
     Write-Host $Text -ForegroundColor $colors[$Color]
 }
 
-Write-ColorOutput "🐳 Docker and NVIDIA GPU Setup for Windows" "Blue"
+Write-ColorOutput "Docker and NVIDIA GPU Setup for Windows" "Blue"
 Write-ColorOutput "===========================================" "Blue"
 
 # Check administrator privileges
 if (-not (Test-Administrator)) {
-    Write-ColorOutput "❌ Этот скрипт должен запускаться с правами администратора" "Red"
-    Write-ColorOutput "💡 Запустите PowerShell как администратор и попробуйте снова" "Yellow"
+    Write-ColorOutput "Этот скрипт должен запускаться с правами администратора" "Red"
+    Write-ColorOutput "Запустите PowerShell как администратор и попробуйте снова" "Yellow"
     exit 1
 }
 
 # Check Windows version
 $osVersion = [System.Environment]::OSVersion.Version
 if ($osVersion.Major -lt 10) {
-    Write-ColorOutput "❌ Требуется Windows 10 или новее" "Red"
+    Write-ColorOutput "Требуется Windows 10 или новее" "Red"
     exit 1
 }
 
-Write-ColorOutput "✅ Windows $($osVersion.Major).$($osVersion.Minor) обнаружена" "Green"
+Write-ColorOutput "Windows $($osVersion.Major).$($osVersion.Minor) обнаружена" "Green"
 
 # Function to check if WSL is available
 function Test-WSL {
@@ -58,7 +58,7 @@ function Test-WSL {
 
 # Function to install WSL2
 function Install-WSL2 {
-    Write-ColorOutput "📦 Устанавливаем WSL2..." "Blue"
+    Write-ColorOutput "Устанавливаем WSL2..." "Blue"
     
     # Enable WSL feature
     dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
@@ -68,17 +68,17 @@ function Install-WSL2 {
     $wslUpdateUrl = "https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi"
     $wslUpdatePath = "$env:TEMP\wsl_update_x64.msi"
     
-    Write-ColorOutput "📥 Скачиваем WSL2 kernel update..." "Blue"
+    Write-ColorOutput "Скачиваем WSL2 kernel update..." "Blue"
     Invoke-WebRequest -Uri $wslUpdateUrl -OutFile $wslUpdatePath
     
-    Write-ColorOutput "📦 Устанавливаем WSL2 kernel update..." "Blue"
+    Write-ColorOutput "Устанавливаем WSL2 kernel update..." "Blue"
     Start-Process msiexec.exe -Wait -ArgumentList "/i $wslUpdatePath /quiet"
     
     # Set WSL2 as default
     wsl --set-default-version 2
     
-    Write-ColorOutput "✅ WSL2 установлен" "Green"
-    Write-ColorOutput "💡 Установите Ubuntu из Microsoft Store после перезагрузки" "Yellow"
+    Write-ColorOutput "WSL2 установлен" "Green"
+    Write-ColorOutput "Установите Ubuntu из Microsoft Store после перезагрузки" "Yellow"
 }
 
 # Function to install Docker Desktop

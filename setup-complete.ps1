@@ -27,7 +27,7 @@ function Write-ColorOutput {
     Write-Host $Text -ForegroundColor $colors[$Color]
 }
 
-Write-ColorOutput "🎤 Whisper Diarization Pipeline - Complete Setup" "Purple"
+Write-ColorOutput "Whisper Diarization Pipeline - Complete Setup" "Purple"
 Write-ColorOutput "=================================================" "Purple"
 Write-Host ""
 Write-ColorOutput "Этот скрипт автоматически установит:" "Blue"
@@ -47,17 +47,17 @@ if (-not $Force) {
     }
 }
 
-Write-ColorOutput "🚀 Начинаем установку..." "Blue"
+Write-ColorOutput "Начинаем установку..." "Blue"
 
 # Check administrator privileges
 if (-not (Test-Administrator)) {
-    Write-ColorOutput "❌ Требуются права администратора" "Red"
-    Write-ColorOutput "💡 Запустите PowerShell как администратор и попробуйте снова" "Yellow"
+    Write-ColorOutput "Требуются права администратора" "Red"
+    Write-ColorOutput "Запустите PowerShell как администратор и попробуйте снова" "Yellow"
     exit 1
 }
 
 # Step 1: Install dependencies via PowerShell script
-Write-ColorOutput "📦 Шаг 1: Установка зависимостей..." "Blue"
+Write-ColorOutput "Шаг 1: Установка зависимостей..." "Blue"
 if (Test-Path "install-docker.ps1") {
     Write-ColorOutput "Запускаем install-docker.ps1..." "Blue"
     $installArgs = @()
@@ -71,87 +71,87 @@ if (Test-Path "install-docker.ps1") {
             & ".\install-docker.ps1"
         }
     } catch {
-        Write-ColorOutput "❌ Ошибка установки зависимостей" "Red"
-        Write-ColorOutput "💡 Попробуйте установить Docker Desktop вручную" "Yellow"
+        Write-ColorOutput "Ошибка установки зависимостей" "Red"
+        Write-ColorOutput "Попробуйте установить Docker Desktop вручную" "Yellow"
     }
 } else {
-    Write-ColorOutput "❌ Файл install-docker.ps1 не найден" "Red"
-    Write-ColorOutput "💡 Скачайте Docker Desktop: https://www.docker.com/products/docker-desktop" "Yellow"
+    Write-ColorOutput "Файл install-docker.ps1 не найден" "Red"
+    Write-ColorOutput "Скачайте Docker Desktop: https://www.docker.com/products/docker-desktop" "Yellow"
 }
 
 # Step 2: Create directories
-Write-ColorOutput "📁 Шаг 2: Создание директорий..." "Blue"
+Write-ColorOutput "Шаг 2: Создание директорий..." "Blue"
 $dirs = @("input", "output", "models")
 foreach ($dir in $dirs) {
     if (-not (Test-Path $dir)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
-        Write-ColorOutput "✅ Создана директория: $dir" "Green"
+        Write-ColorOutput "Создана директория: $dir" "Green"
     }
 }
 
 # Step 3: Setup environment
-Write-ColorOutput "⚙️  Шаг 3: Настройка окружения..." "Blue"
+Write-ColorOutput "Шаг 3: Настройка окружения..." "Blue"
 if (-not (Test-Path ".env")) {
     if (Test-Path "env.example") {
         Copy-Item "env.example" ".env"
-        Write-ColorOutput "✅ Создан файл .env из шаблона" "Green"
-        Write-ColorOutput "💡 Отредактируйте .env и добавьте HUGGINGFACE_TOKEN если нужно" "Yellow"
+        Write-ColorOutput "Создан файл .env из шаблона" "Green"
+        Write-ColorOutput "Отредактируйте .env и добавьте HUGGINGFACE_TOKEN если нужно" "Yellow"
     }
 } else {
-    Write-ColorOutput "✅ Файл .env уже существует" "Green"
+    Write-ColorOutput "Файл .env уже существует" "Green"
 }
 
 # Step 4: Test Docker
-Write-ColorOutput "🧪 Шаг 4: Проверка Docker..." "Blue"
+Write-ColorOutput "Шаг 4: Проверка Docker..." "Blue"
 $dockerWorking = $false
 try {
     docker run --rm hello-world | Out-Null
-    Write-ColorOutput "✅ Docker работает корректно" "Green"
+    Write-ColorOutput "Docker работает корректно" "Green"
     $dockerWorking = $true
 } catch {
-    Write-ColorOutput "❌ Проблемы с Docker" "Red"
-    Write-ColorOutput "💡 Убедитесь что Docker Desktop запущен" "Yellow"
-    Write-ColorOutput "💡 Возможно нужна перезагрузка" "Yellow"
+    Write-ColorOutput "Проблемы с Docker" "Red"
+    Write-ColorOutput "Убедитесь что Docker Desktop запущен" "Yellow"
+    Write-ColorOutput "Возможно нужна перезагрузка" "Yellow"
 }
 
 # Step 5: Check GPU support
-Write-ColorOutput "🎮 Шаг 5: Проверка GPU поддержки..." "Blue"
+Write-ColorOutput "Шаг 5: Проверка GPU поддержки..." "Blue"
 $gpuAvailable = $false
 
 if (-not $SkipNvidia) {
     try {
         nvidia-smi | Out-Null
-        Write-ColorOutput "✅ NVIDIA GPU обнаружена" "Green"
+        Write-ColorOutput "NVIDIA GPU обнаружена" "Green"
         
         if ($dockerWorking) {
             try {
                 $dockerInfo = docker info 2>$null | Out-String
                 if ($dockerInfo -match "nvidia") {
-                    Write-ColorOutput "✅ NVIDIA Docker runtime доступен" "Green"
+                    Write-ColorOutput "NVIDIA Docker runtime доступен" "Green"
                     $gpuAvailable = $true
                 } else {
-                    Write-ColorOutput "⚠️  NVIDIA Docker runtime не настроен" "Yellow"
-                    Write-ColorOutput "💡 Docker Desktop автоматически поддерживает NVIDIA GPU" "Yellow"
+                    Write-ColorOutput "NVIDIA Docker runtime не настроен" "Yellow"
+                    Write-ColorOutput "Docker Desktop автоматически поддерживает NVIDIA GPU" "Yellow"
                 }
             } catch {
-                Write-ColorOutput "⚠️  Не удалось проверить Docker info" "Yellow"
+                Write-ColorOutput "Не удалось проверить Docker info" "Yellow"
             }
         }
     } catch {
-        Write-ColorOutput "⚠️  NVIDIA GPU не обнаружена" "Yellow"
-        Write-ColorOutput "💡 Установите NVIDIA драйверы для GPU ускорения" "Yellow"
+        Write-ColorOutput "NVIDIA GPU не обнаружена" "Yellow"
+        Write-ColorOutput "Установите NVIDIA драйверы для GPU ускорения" "Yellow"
     }
 }
 
 # Step 6: Build Docker images
 if ($dockerWorking) {
-    Write-ColorOutput "🔨 Шаг 6: Сборка Docker образов..." "Blue"
+    Write-ColorOutput "Шаг 6: Сборка Docker образов..." "Blue"
     
     $profile = if ($gpuAvailable) { "gpu" } else { "cpu" }
     $service = if ($gpuAvailable) { "whisper-diarization-gpu" } else { "whisper-diarization-cpu" }
     $version = if ($gpuAvailable) { "GPU" } else { "CPU" }
     
-    Write-ColorOutput "🚀 Собираем $version версию..." $(if ($gpuAvailable) { "Green" } else { "Yellow" })
+    Write-ColorOutput "Собираем $version версию..." $(if ($gpuAvailable) { "Green" } else { "Yellow" })
     
     try {
         $composeCommand = "docker compose"
@@ -165,38 +165,38 @@ if ($dockerWorking) {
             & docker compose --profile $profile build $service
         }
         
-        Write-ColorOutput "✅ Docker образ собран успешно" "Green"
+        Write-ColorOutput "Docker образ собран успешно" "Green"
     } catch {
-        Write-ColorOutput "❌ Ошибка сборки Docker образа" "Red"
-        Write-ColorOutput "💡 Проверьте интернет соединение" "Yellow"
+        Write-ColorOutput "Ошибка сборки Docker образа" "Red"
+        Write-ColorOutput "Проверьте интернет соединение" "Yellow"
     }
 } else {
-    Write-ColorOutput "⚠️  Пропускаем сборку - Docker не работает" "Yellow"
+    Write-ColorOutput "Пропускаем сборку - Docker не работает" "Yellow"
 }
 
 # Step 7: Test the pipeline
 if ($dockerWorking) {
-    Write-ColorOutput "🧪 Шаг 7: Тестирование системы..." "Blue"
+    Write-ColorOutput "Шаг 7: Тестирование системы..." "Blue"
     Write-ColorOutput "Показываем справку..." "Blue"
     
     try {
         if (Test-Path "run.ps1") {
             & ".\run.ps1" -Help
         } else {
-            Write-ColorOutput "💡 Используйте run.ps1 для запуска или run.sh в WSL/Git Bash" "Yellow"
+            Write-ColorOutput "Используйте run.ps1 для запуска или run.sh в WSL/Git Bash" "Yellow"
         }
     } catch {
-        Write-ColorOutput "⚠️  Не удалось показать справку" "Yellow"
+        Write-ColorOutput "Не удалось показать справку" "Yellow"
     }
 }
 
 # Final results
 Write-Host ""
-Write-ColorOutput "🎉 Установка завершена!" "Green"
+Write-ColorOutput "Установка завершена!" "Green"
 Write-Host ""
-Write-ColorOutput "📋 Что дальше:" "Purple"
+Write-ColorOutput "Что дальше:" "Purple"
 Write-Host ""
-Write-ColorOutput "1. Поместите аудиофайл в директорию input\:" "Blue"
+Write-ColorOutput "1. Поместите аудиофайл в директорию input:" "Blue"
 Write-ColorOutput "   copy your_audio.wav input\" "Green"
 Write-Host ""
 Write-ColorOutput "2. Запустите обработку:" "Blue"
@@ -207,16 +207,16 @@ Write-ColorOutput "3. Результаты будут в директории ou
 Write-Host ""
 
 if ($gpuAvailable) {
-    Write-ColorOutput "💡 Рекомендуемая версия: GPU (RTX 3080 обнаружена!)" "Green"
+    Write-ColorOutput "Рекомендуемая версия: GPU (RTX 3080 обнаружена!)" "Green"
 } else {
-    Write-ColorOutput "💡 Рекомендуемая версия: CPU" "Yellow"
+    Write-ColorOutput "Рекомендуемая версия: CPU" "Yellow"
     if (-not $SkipNvidia) {
-        Write-ColorOutput "💡 Для GPU ускорения установите NVIDIA драйверы" "Yellow"
+        Write-ColorOutput "Для GPU ускорения установите NVIDIA драйверы" "Yellow"
     }
 }
 
 Write-Host ""
-Write-ColorOutput "📖 Подробная документация: README.md" "Blue"
-Write-ColorOutput "🐛 Проблемы? Проверьте INSTALLATION.md" "Blue"
+Write-ColorOutput "Подробная документация: README.md" "Blue"
+Write-ColorOutput "Проблемы? Проверьте INSTALLATION.md" "Blue"
 Write-Host ""
-Write-ColorOutput "Готово к использованию! 🚀" "Purple" 
+Write-ColorOutput "Готово к использованию!" "Purple" 

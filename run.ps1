@@ -29,13 +29,13 @@ function Write-ColorOutput {
     Write-Host $Text -ForegroundColor $colors[$Color]
 }
 
-Write-ColorOutput "🎤 Whisper Diarization Pipeline" "Blue"
+Write-ColorOutput "Whisper Diarization Pipeline" "Blue"
 Write-ColorOutput "================================" "Blue"
 
 # Check if Docker is installed
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-ColorOutput "❌ Docker не установлен. Установите Docker Desktop и попробуйте снова." "Red"
-    Write-ColorOutput "💡 Запустите: PowerShell -ExecutionPolicy Bypass -File install-docker.ps1" "Yellow"
+    Write-ColorOutput "Docker не установлен. Установите Docker Desktop и попробуйте снова." "Red"
+    Write-ColorOutput "Запустите: PowerShell -ExecutionPolicy Bypass -File install-docker.ps1" "Yellow"
     exit 1
 }
 
@@ -43,7 +43,7 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 try {
     docker version | Out-Null
 } catch {
-    Write-ColorOutput "❌ Docker не запущен. Запустите Docker Desktop и попробуйте снова." "Red"
+    Write-ColorOutput "Docker не запущен. Запустите Docker Desktop и попробуйте снова." "Red"
     exit 1
 }
 
@@ -58,7 +58,7 @@ if (Get-Command docker-compose -ErrorAction SilentlyContinue) {
 }
 
 if (-not $dockerComposeAvailable) {
-    Write-ColorOutput "❌ Docker Compose не найден. Обновите Docker Desktop." "Red"
+    Write-ColorOutput "Docker Compose не найден. Обновите Docker Desktop." "Red"
     exit 1
 }
 
