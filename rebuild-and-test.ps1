@@ -21,6 +21,32 @@ Write-ColorOutput "Rebuild and Test - Whisper Diarization Pipeline" "Purple"
 Write-ColorOutput "==============================================" "Purple"
 Write-Host ""
 
+# Function to load environment variables from .env file
+function Load-EnvFile {
+    param([string]$FilePath = ".env")
+    
+    if (Test-Path $FilePath) {
+        Write-ColorOutput "Loading environment variables from $FilePath..." "Blue"
+        Get-Content $FilePath | ForEach-Object {
+            if ($_ -match "^\s*([^#][^=]*)\s*=\s*(.*)\s*$") {
+                $name = $matches[1].Trim()
+                $value = $matches[2].Trim()
+                # Remove quotes if present
+                $value = $value -replace '^["'']|["'']$', ''
+                
+                # Set environment variable for current session
+                Set-Item -Path "env:$name" -Value $value
+                Write-ColorOutput "  Set $name" "Green"
+            }
+        }
+    } else {
+        Write-ColorOutput "No .env file found at $FilePath" "Yellow"
+    }
+}
+
+# Load environment variables from .env file
+Load-EnvFile
+
 # Step 1: Check Docker
 Write-ColorOutput "Step 1: Checking Docker..." "Blue"
 try {

@@ -5,6 +5,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: whisper-pipeline-gpu
+    env_file:
+      - .env
     deploy:
       resources:
         reservations:
@@ -33,6 +35,8 @@ services:
       context: .
       dockerfile: Dockerfile.cpu
     container_name: whisper-pipeline-cpu
+    env_file:
+      - .env
     volumes:
       - ./input:/app/input:ro
       - ./output:/app/output
@@ -52,6 +56,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: whisper-pipeline
+    env_file:
+      - .env
     volumes:
       - ./input:/app/input:ro
       - ./output:/app/output
