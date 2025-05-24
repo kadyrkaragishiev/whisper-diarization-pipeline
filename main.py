@@ -23,6 +23,16 @@ import pandas as pd
 from tqdm import tqdm
 import time
 
+# Импорты для работы с кастомными моделями HuggingFace
+try:
+    from transformers import WhisperForConditionalGeneration, WhisperProcessor, WhisperTokenizer
+    from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, pipeline
+    HF_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    print("⚠️  transformers не установлен. Кастомные модели HF недоступны.")
+    print("💡 Для поддержки кастомных моделей установите: pip install transformers")
+    HF_TRANSFORMERS_AVAILABLE = False
+
 # Подавляем предупреждения
 warnings.filterwarnings("ignore")
 
@@ -31,7 +41,8 @@ class AudioProcessor:
     """Класс для обработки аудио: транскрипция + диаризация"""
     
     def __init__(self, whisper_model: str = "base", hf_token: Optional[str] = None, 
-                 local_models_dir: Optional[str] = None, device: Optional[str] = None):
+                 local_models_dir: Optional[str] = None, device: Optional[str] = None,
+                 custom_whisper_model: Optional[str] = None):
         """
         Инициализация процессора
         
@@ -40,10 +51,15 @@ class AudioProcessor:
             hf_token: HuggingFace токен для PyAnnotate
             local_models_dir: Директория с локально сохраненными моделями
             device: Устройство для инференса (cpu, cuda, mps)
+            custom_whisper_model: Путь к кастомной модели Whisper (HuggingFace format) или HF model ID
         """
         self.whisper_model_name = whisper_model
+        self.custom_whisper_model = custom_whisper_model
         self.hf_token = hf_token
         self.local_models_dir = Path(local_models_dir) if local_models_dir else None
+        
+        # Тип модели Whisper (standard или custom)
+        self.whisper_model_type = "custom" if custom_whisper_model else "standard"
         
         # Выбор устройства
         if device is not None:
@@ -57,6 +73,16 @@ class AudioProcessor:
                 self.device = "cpu"
             
         print(f"🔧 Используется устройство: {self.device}")
+        
+        # Инициализируем переменные для моделей
+        self.whisper_model = None
+        self.whisper_processor = None
+        self.whisper_pipeline = None  # Для pipeline API
+        
+        if self.custom_whisper_model:
+            print(f"🧠 Кастомная модель Whisper: {self.custom_whisper_model}")
+        else:
+            print(f"🧠 Стандартная модель Whisper: {whisper_model}")
         
         # Загружаем модели
         self._load_models()
@@ -81,27 +107,17 @@ class AudioProcessor:
         """Загрузка моделей Whisper и PyAnnotate"""
         print("📥 Загружаем модель Whisper...")
         
-        # Пытаемся загрузить модель Whisper
+        # Загрузка Whisper модели
         whisper_device = self.device
-        try:
-            self.whisper_model = whisper.load_model(
-                self.whisper_model_name, 
-                device=whisper_device
-            )
-            print(f"✅ Модель Whisper загружена на {whisper_device}")
-        except Exception as e:
-            if whisper_device == "mps" and ("SparseMPS" in str(e) or "aten::empty.memory_format" in str(e) or "_sparse_coo_tensor_with_dims_and_tensors" in str(e)):
-                print(f"⚠️  Ошибка загрузки Whisper на MPS: {e}")
-                print("🔄 Переключаемся на CPU для Whisper...")
-                whisper_device = "cpu"
-                self.whisper_model = whisper.load_model(
-                    self.whisper_model_name, 
-                    device=whisper_device
-                )
-                print("✅ Модель Whisper загружена на CPU")
-            else:
-                raise e
         
+        if self.whisper_model_type == "custom" and self.custom_whisper_model:
+            # Загружаем кастомную модель через transformers
+            self._load_custom_whisper_model(whisper_device)
+        else:
+            # Загружаем стандартную модель через whisper
+            self._load_standard_whisper_model(whisper_device)
+        
+        # Загрузка модели диаризации (остается без изменений)
         print("📥 Загружаем модель диаризации...")
         self.diarization_pipeline = None
         
@@ -179,6 +195,117 @@ class AudioProcessor:
             print("💡 Или скачайте модели локально: python download_models.py")
             self.diarization_pipeline = None
     
+    def _load_standard_whisper_model(self, whisper_device: str):
+        """Загрузка стандартной модели Whisper"""
+        try:
+            self.whisper_model = whisper.load_model(
+                self.whisper_model_name, 
+                device=whisper_device
+            )
+            self.whisper_processor = None  # Стандартная модель не использует processor
+            print(f"✅ Стандартная модель Whisper загружена на {whisper_device}")
+        except Exception as e:
+            if whisper_device == "mps" and ("SparseMPS" in str(e) or "aten::empty.memory_format" in str(e) or "_sparse_coo_tensor_with_dims_and_tensors" in str(e)):
+                print(f"⚠️  Ошибка загрузки Whisper на MPS: {e}")
+                print("🔄 Переключаемся на CPU для Whisper...")
+                whisper_device = "cpu"
+                self.whisper_model = whisper.load_model(
+                    self.whisper_model_name, 
+                    device=whisper_device
+                )
+                print("✅ Стандартная модель Whisper загружена на CPU")
+            else:
+                raise e
+    
+    def _load_custom_whisper_model(self, whisper_device: str):
+        """Загрузка кастомной модели Whisper через transformers с pipeline API"""
+        if not HF_TRANSFORMERS_AVAILABLE:
+            raise ImportError("transformers не доступен для загрузки кастомных моделей")
+        
+        try:
+            print(f"🔄 Загружаем кастомную модель Whisper: {self.custom_whisper_model}")
+            
+            # Настройки типа данных как в официальной документации
+            torch_dtype = torch.bfloat16 if whisper_device != "cpu" else torch.float32
+            
+            # Monkey patching для MPS как в документации
+            if whisper_device == "mps" and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                try:
+                    setattr(torch.distributed, "is_initialized", lambda: False)
+                    print("🔧 Применен monkey patch для MPS")
+                except Exception as e:
+                    print(f"⚠️  Не удалось применить monkey patch для MPS: {e}")
+            
+            # Загружаем модель с рекомендованными параметрами
+            model_kwargs = {
+                "torch_dtype": torch_dtype,
+                "low_cpu_mem_usage": True,
+                "use_safetensors": True
+            }
+            
+            # Добавляем flash attention если доступно (для CUDA)
+            if whisper_device == "cuda":
+                try:
+                    model_kwargs["attn_implementation"] = "flash_attention_2"
+                    print("🚀 Включен flash_attention_2")
+                except Exception:
+                    print("⚠️  flash_attention_2 недоступен, используем стандартное внимание")
+            
+            if Path(self.custom_whisper_model).exists():
+                # Локальная модель
+                print("🏠 Загружаем локальную кастомную модель...")
+                self.whisper_model = WhisperForConditionalGeneration.from_pretrained(
+                    self.custom_whisper_model,
+                    **model_kwargs
+                )
+                self.whisper_processor = WhisperProcessor.from_pretrained(self.custom_whisper_model)
+            else:
+                # Модель из HuggingFace Hub
+                print("🌐 Загружаем кастомную модель из HuggingFace Hub...")
+                self.whisper_model = WhisperForConditionalGeneration.from_pretrained(
+                    self.custom_whisper_model,
+                    **model_kwargs
+                )
+                self.whisper_processor = WhisperProcessor.from_pretrained(self.custom_whisper_model)
+            
+            # Создаем pipeline как в официальной документации
+            print("🔄 Создаем ASR pipeline...")
+            
+            # Настраиваем device для pipeline
+            pipeline_device = whisper_device
+            if whisper_device == "mps":
+                # Для MPS используем device index
+                pipeline_device = torch.device(whisper_device)
+            
+            self.whisper_pipeline = pipeline(
+                "automatic-speech-recognition",
+                model=self.whisper_model,
+                tokenizer=self.whisper_processor.tokenizer,
+                feature_extractor=self.whisper_processor.feature_extractor,
+                max_new_tokens=256,
+                chunk_length_s=30,
+                batch_size=16,
+                return_timestamps=True,
+                torch_dtype=torch_dtype,
+                device=pipeline_device
+            )
+            
+            print(f"✅ Кастомная модель Whisper загружена с pipeline API")
+            
+        except Exception as e:
+            if whisper_device == "mps" and ("MPS" in str(e) or "SparseMPS" in str(e)):
+                print(f"⚠️  Ошибка загрузки кастомной модели на MPS: {e}")
+                print("🔄 Переключаемся на CPU для кастомной модели...")
+                whisper_device = "cpu"
+                self._load_custom_whisper_model(whisper_device)
+            else:
+                print(f"❌ Ошибка загрузки кастомной модели: {e}")
+                print("🔄 Переключаемся на стандартную модель...")
+                self.whisper_model_type = "standard"
+                self.custom_whisper_model = None
+                self.whisper_pipeline = None
+                self._load_standard_whisper_model(whisper_device)
+    
     def _prepare_audio(self, audio_path: str) -> str:
         """
         Подготовка аудио для обработки (конвертация в нужный формат)
@@ -207,18 +334,47 @@ class AudioProcessor:
         
         return temp_wav.name
     
-    def transcribe(self, audio_path: str) -> Dict:
+    def transcribe(self, audio_path: str, time_limit: Optional[float] = None) -> Dict:
         """
         Транскрипция аудио с помощью Whisper
         
         Args:
             audio_path: Путь к аудиофайлу
+            time_limit: Ограничение времени транскрипции в секундах
             
         Returns:
             Результат транскрипции
         """
         print("🎤 Начинаем транскрипцию...")
         
+        # Если указано ограничение по времени, обрезаем аудио
+        if time_limit is not None:
+            print(f"⏱️  Ограничение времени: {time_limit} секунд")
+            audio, sr = librosa.load(audio_path, sr=16000)
+            max_samples = int(time_limit * sr)
+            if len(audio) > max_samples:
+                audio = audio[:max_samples]
+                temp_wav = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+                sf.write(temp_wav.name, audio, sr)
+                audio_path = temp_wav.name
+                print(f"✂️  Аудио обрезано до {time_limit} секунд")
+        
+        # Выбираем метод транскрипции в зависимости от типа модели
+        if self.whisper_model_type == "custom" and self.whisper_pipeline is not None:
+            result = self._transcribe_with_pipeline(audio_path)
+        elif self.whisper_model_type == "custom" and self.whisper_processor is not None:
+            result = self._transcribe_with_custom_model(audio_path)
+        else:
+            result = self._transcribe_with_standard_model(audio_path)
+        
+        # Если мы создали временный файл, удаляем его
+        if time_limit is not None and audio_path != audio_path:
+            os.unlink(audio_path)
+        
+        return result
+    
+    def _transcribe_with_standard_model(self, audio_path: str) -> Dict:
+        """Транскрипция со стандартной моделью Whisper"""
         # Дополнительные параметры для предотвращения пропуска начала аудио
         transcribe_options = {
             "language": "ru",
@@ -231,8 +387,8 @@ class AudioProcessor:
         }
         
         # Для моделей small и medium добавляем дополнительные настройки
-        if self.whisper_model_name in ['small', 'medium']:
-            print("🔧 Применяем дополнительные настройки для small/medium модели...")
+        if self.whisper_model_name in ['small', 'medium', 'large']:
+            print("🔧 Применяем дополнительные настройки для small/medium/large модели...")
             transcribe_options.update({
                 "temperature": 0.1,    # Немного увеличиваем температуру
                 "no_speech_threshold": 0.3,  # Еще ниже порог
@@ -245,6 +401,199 @@ class AudioProcessor:
         )
         
         return result
+    
+    def _transcribe_with_custom_model(self, audio_path: str) -> Dict:
+        """Транскрипция с кастомной моделью через transformers"""
+        import librosa
+        
+        print("🔧 Используем кастомную модель для транскрипции...")
+        
+        # Загружаем аудио
+        audio, sr = librosa.load(audio_path, sr=16000)
+        
+        # Подготавливаем входные данные
+        inputs = self.whisper_processor(
+            audio, 
+            sampling_rate=16000, 
+            return_tensors="pt"
+        )
+        
+        # Перемещаем на то же устройство, что и модель (с проверкой совместимости)
+        if hasattr(self.whisper_model, 'device') and self.whisper_model.device != torch.device('cpu'):
+            try:
+                inputs = {k: v.to(self.whisper_model.device) for k, v in inputs.items()}
+            except Exception as e:
+                print(f"⚠️  Не удалось переместить входные данные на {self.whisper_model.device}: {e}")
+                print("🔄 Используем CPU для входных данных...")
+        
+        # Настройки генерации для русского языка
+        generate_kwargs = {
+            "language": "russian",
+            "task": "transcribe",
+            "return_timestamps": True,
+            "max_new_tokens": 256,  # Уменьшено с 448 до 256 для избежания превышения лимитов
+            "do_sample": False,  # Детерминированная генерация
+            "num_beams": 1,      # Greedy search
+        }
+        
+        # Убираем return_timestamps если не поддерживается
+        try:
+            # Генерируем транскрипцию
+            with torch.no_grad():
+                predicted_ids = self.whisper_model.generate(
+                    inputs["input_features"],
+                    **generate_kwargs
+                )
+        except Exception as e:
+            if "return_timestamps" in str(e):
+                print("⚠️  return_timestamps не поддерживается, используем без временных меток")
+                generate_kwargs.pop("return_timestamps", None)
+                with torch.no_grad():
+                    predicted_ids = self.whisper_model.generate(
+                        inputs["input_features"],
+                        **generate_kwargs
+                    )
+            else:
+                raise e
+        
+        # Декодируем результат
+        transcription = self.whisper_processor.batch_decode(
+            predicted_ids, 
+            skip_special_tokens=True
+        )[0]
+        
+        # Получаем детальную информацию с временными метками
+        detailed_result = self._get_detailed_transcription_custom(
+            audio_path, inputs, predicted_ids, transcription
+        )
+        
+        return detailed_result
+    
+    def _get_detailed_transcription_custom(self, audio_path: str, inputs: Dict, 
+                                         predicted_ids: torch.Tensor, full_text: str) -> Dict:
+        """Получение детальной транскрипции с временными метками для кастомной модели"""
+        
+        # Пока что возвращаем базовую структуру, совместимую со стандартной моделью
+        # В будущем можно добавить более детальную обработку временных меток
+        
+        # Приблизительно разбиваем на сегменты по длине аудио
+        audio, sr = librosa.load(audio_path, sr=16000)
+        audio_duration = len(audio) / sr
+        
+        # Простое разбиение на сегменты по словам/предложениям
+        sentences = full_text.split('. ')
+        segments = []
+        
+        segment_duration = audio_duration / len(sentences) if sentences else audio_duration
+        
+        for i, sentence in enumerate(sentences):
+            if sentence.strip():
+                start_time = i * segment_duration
+                end_time = min((i + 1) * segment_duration, audio_duration)
+                
+                segments.append({
+                    "start": start_time,
+                    "end": end_time,
+                    "text": sentence.strip() + ('.' if i < len(sentences) - 1 else '')
+                })
+        
+        # Если нет сегментов, создаем один
+        if not segments:
+            segments = [{
+                "start": 0.0,
+                "end": audio_duration,
+                "text": full_text
+            }]
+        
+        return {
+            "text": full_text,
+            "segments": segments,
+            "language": "ru"
+        }
+    
+    def _transcribe_with_pipeline(self, audio_path: str) -> Dict:
+        """Транскрипция с использованием pipeline API (рекомендовано для кастомных моделей)"""
+        print("🔧 Используем pipeline API для транскрипции...")
+        
+        try:
+            # Загружаем аудио как numpy array (правильный формат для pipeline)
+            import librosa
+            
+            print("🔄 Загружаем аудио файл...")
+            audio, sr = librosa.load(audio_path, sr=16000)
+            
+            # Параметры генерации как в официальной документации
+            generate_kwargs = {
+                "language": "russian",
+                "max_new_tokens": 256
+            }
+            
+            # Запускаем транскрипцию через pipeline
+            print("🎤 Выполняем транскрипцию через pipeline...")
+            pipeline_result = self.whisper_pipeline(
+                audio,  # Передаем numpy array вместо BytesIO
+                generate_kwargs=generate_kwargs,
+                return_timestamps=True
+            )
+            
+            # Преобразуем результат pipeline в формат, совместимый со стандартной моделью
+            result = self._convert_pipeline_result_to_standard_format(pipeline_result, audio_path)
+            
+            return result
+            
+        except Exception as e:
+            print(f"⚠️  Ошибка транскрипции через pipeline: {e}")
+            print("🔄 Переключаемся на альтернативный метод...")
+            # Fallback на стандартный метод кастомной модели
+            return self._transcribe_with_custom_model(audio_path)
+    
+    def _convert_pipeline_result_to_standard_format(self, pipeline_result: Dict, audio_path: str) -> Dict:
+        """Конвертирует результат pipeline в стандартный формат"""
+        # Pipeline возвращает результат в формате:
+        # {"text": "...", "chunks": [{"timestamp": (start, end), "text": "..."}]}
+        
+        text = pipeline_result.get("text", "")
+        chunks = pipeline_result.get("chunks", [])
+        
+        # Создаем сегменты в формате Whisper
+        segments = []
+        
+        if chunks:
+            for chunk in chunks:
+                timestamp = chunk.get("timestamp")
+                chunk_text = chunk.get("text", "")
+                
+                if timestamp and len(timestamp) >= 2:
+                    start_time = timestamp[0] if timestamp[0] is not None else 0.0
+                    end_time = timestamp[1] if timestamp[1] is not None else start_time + 1.0
+                    
+                    segments.append({
+                        "start": start_time,
+                        "end": end_time,
+                        "text": chunk_text.strip()
+                    })
+        
+        # Если нет chunks, создаем один сегмент из всего текста
+        if not segments and text:
+            # Получаем длительность аудио
+            try:
+                import librosa
+                audio, sr = librosa.load(audio_path, sr=16000)
+                audio_duration = len(audio) / sr
+            except Exception:
+                audio_duration = 30.0  # Fallback
+            
+            segments = [{
+                "start": 0.0,
+                "end": audio_duration,
+                "text": text.strip()
+            }]
+        
+        return {
+            "text": text,
+            "segments": segments,
+            "language": "ru"
+        }
     
     def diarize(self, audio_path: str, min_speakers: int = 1, max_speakers: int = 10, 
                 min_segment_duration: float = 0.5) -> Optional[Dict]:
@@ -594,7 +943,8 @@ class AudioProcessor:
     
     def process(self, audio_path: str, output_dir: str = "output", 
                 min_speakers: int = 1, max_speakers: int = 10, 
-                min_segment_duration: float = 0.5, alignment_strategy: str = "smart") -> Dict:
+                min_segment_duration: float = 0.5, alignment_strategy: str = "smart",
+                time_limit: Optional[float] = None) -> Dict:
         """
         Полная обработка аудио: транскрипция + диаризация
         
@@ -605,6 +955,7 @@ class AudioProcessor:
             max_speakers: Максимальное количество спикеров  
             min_segment_duration: Минимальная длительность сегмента
             alignment_strategy: Стратегия совмещения ('strict', 'smart', 'aggressive')
+            time_limit: Ограничение времени транскрипции в секундах
             
         Returns:
             Результаты обработки
@@ -619,7 +970,7 @@ class AudioProcessor:
         try:
             # Транскрипция
             start_time = time.time()
-            transcription_result = self.transcribe(prepared_audio)
+            transcription_result = self.transcribe(prepared_audio, time_limit=time_limit)
             transcription_time = time.time() - start_time
             
             # Диаризация с улучшенными параметрами
@@ -787,7 +1138,9 @@ class AudioProcessor:
 @click.argument('audio_file', type=click.Path(exists=True))
 @click.option('--model', '-m', default='large', 
               type=click.Choice(['tiny', 'base', 'small', 'medium', 'large']),
-              help='Модель Whisper для использования')
+              help='Модель Whisper для использования (только для стандартных моделей)')
+@click.option('--custom-model', '--custom-whisper-model', 
+              help='Путь к кастомной модели Whisper (HuggingFace format) или HF model ID')
 @click.option('--output', '-o', default='output', 
               help='Директория для сохранения результатов')
 @click.option('--hf-token', envvar='HUGGINGFACE_TOKEN', 
@@ -806,20 +1159,31 @@ class AudioProcessor:
               help='Стратегия совмещения (strict, smart, aggressive)')
 @click.option('--test-transcription', is_flag=True,
               help='Протестировать разные настройки транскрипции для диагностики проблем')
-def main(audio_file: str, model: str, output: str, hf_token: Optional[str], 
+@click.option('--time-limit', type=float,
+              help='Ограничение времени транскрипции в секундах (например, 3500 для транскрипции первых 3500 секунд)')
+def main(audio_file: str, model: str, custom_model: Optional[str], output: str, hf_token: Optional[str], 
          local_models: Optional[str], device: Optional[str], min_speakers: int, 
-         max_speakers: int, min_segment: float, alignment_strategy: str, test_transcription: bool):
+         max_speakers: int, min_segment: float, alignment_strategy: str, test_transcription: bool,
+         time_limit: Optional[float]):
     """
     Пайплайн транскрипции и диаризации аудио с улучшенными настройками
     
     AUDIO_FILE: Путь к аудиофайлу для обработки
     """
     
-    print("🎵 Whisper + PyAnnote Audio Pipeline (Улучшенная диаризация)")
+    print("🎵 Whisper + PyAnnote Audio Pipeline (Улучшенная диаризация + Кастомные модели)")
     print(f"📁 Обрабатываем: {audio_file}")
-    print(f"🧠 Модель Whisper: {model}")
+    
+    if custom_model:
+        print(f"🧠 Кастомная модель Whisper: {custom_model}")
+    else:
+        print(f"🧠 Стандартная модель Whisper: {model}")
+    
     print(f"📂 Результаты будут сохранены в: {output}")
     print(f"👥 Настройки диаризации: {min_speakers}-{max_speakers} спикеров, мин. сегмент {min_segment}с")
+    
+    if time_limit:
+        print(f"⏱️  Ограничение времени: {time_limit} секунд")
     
     if local_models:
         print(f"🏠 Используем локальные модели из: {local_models}")
@@ -828,13 +1192,20 @@ def main(audio_file: str, model: str, output: str, hf_token: Optional[str],
         print("💡 Установите токен: export HUGGINGFACE_TOKEN=your_token")
         print("💡 Или скачайте модели локально: python download_models.py")
     
+    # Проверяем совместимость опций
+    if custom_model and not HF_TRANSFORMERS_AVAILABLE:
+        print("❌ Для использования кастомных моделей нужна библиотека transformers")
+        print("💡 Установите: pip install transformers")
+        sys.exit(1)
+    
     try:
         # Создаем процессор
         processor = AudioProcessor(
             whisper_model=model, 
             hf_token=hf_token,
             local_models_dir=local_models,
-            device=device
+            device=device,
+            custom_whisper_model=custom_model
         )
         
         # Если включено тестирование, запускаем диагностику
@@ -887,7 +1258,8 @@ def main(audio_file: str, model: str, output: str, hf_token: Optional[str],
             min_speakers=min_speakers,
             max_speakers=max_speakers,
             min_segment_duration=min_segment,
-            alignment_strategy=alignment_strategy
+            alignment_strategy=alignment_strategy,
+            time_limit=time_limit
         )
         
         print("\n✅ Обработка завершена!")

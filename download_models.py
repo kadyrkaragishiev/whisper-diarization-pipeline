@@ -15,6 +15,14 @@ import torch
 from pyannote.audio import Pipeline
 import whisper
 
+# Добавляем поддержку transformers для кастомных моделей
+try:
+    from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
+    HF_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    print("⚠️  transformers не установлен. Кастомные модели HF недоступны.")
+    HF_TRANSFORMERS_AVAILABLE = False
+
 
 class ModelDownloader:
     """Класс для скачивания и сохранения моделей"""
@@ -26,9 +34,11 @@ class ModelDownloader:
         # Папки для разных типов моделей
         self.whisper_dir = self.models_dir / "whisper"
         self.pyannote_dir = self.models_dir / "pyannote"
+        self.custom_whisper_dir = self.models_dir / "custom_whisper"
         
         self.whisper_dir.mkdir(exist_ok=True)
         self.pyannote_dir.mkdir(exist_ok=True)
+        self.custom_whisper_dir.mkdir(exist_ok=True)
         
         # Определяем устройство
         self.device = torch.device("cpu")
@@ -48,6 +58,87 @@ class ModelDownloader:
                 
             except Exception as e:
                 print(f"❌ Ошибка скачивания {model_name}: {e}")
+    
+    def download_custom_whisper_model(self, model_id: str, local_name: Optional[str] = None):
+        """Скачивание кастомной модели Whisper из HuggingFace"""
+        if not HF_TRANSFORMERS_AVAILABLE:
+            print("❌ transformers не установлен. Установите: pip install transformers")
+            return False
+        
+        print(f"📥 Скачиваем кастомную модель Whisper: {model_id}")
+        
+        try:
+            # Определяем имя для сохранения
+            save_name = local_name or model_id.replace("/", "_")
+            save_path = self.custom_whisper_dir / save_name
+            
+            print(f"⬇️  Загружаем модель...")
+            model = AutoModelForSpeechSeq2Seq.from_pretrained(
+                model_id,
+                torch_dtype=torch.float32,
+                low_cpu_mem_usage=True,
+                use_safetensors=True
+            )
+            
+            print(f"⬇️  Загружаем процессор...")
+            processor = AutoProcessor.from_pretrained(model_id)
+            
+            print(f"💾 Сохраняем в: {save_path}")
+            
+            # Сохраняем модель и процессор
+            model.save_pretrained(save_path)
+            processor.save_pretrained(save_path)
+            
+            print(f"✅ Кастомная модель сохранена: {save_path}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Ошибка скачивания кастомной модели: {e}")
+            return False
+    
+    def copy_local_custom_model(self, source_path: str, model_name: str):
+        """Копирование локальной кастомной модели в кеш"""
+        source = Path(source_path)
+        if not source.exists():
+            print(f"❌ Путь не найден: {source_path}")
+            return False
+        
+        dest_path = self.custom_whisper_dir / model_name
+        
+        try:
+            print(f"📁 Копируем модель из {source} в {dest_path}")
+            
+            if dest_path.exists():
+                shutil.rmtree(dest_path)
+            
+            shutil.copytree(source, dest_path)
+            
+            print(f"✅ Модель скопирована: {dest_path}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Ошибка копирования модели: {e}")
+            return False
+    
+    def list_custom_models(self):
+        """Список кастомных моделей в кеше"""
+        if not self.custom_whisper_dir.exists():
+            print("📁 Кастомные модели не найдены")
+            return []
+        
+        models = []
+        for model_dir in self.custom_whisper_dir.iterdir():
+            if model_dir.is_dir() and (model_dir / "config.json").exists():
+                models.append(model_dir.name)
+        
+        if models:
+            print("📋 Кастомные модели в кеше:")
+            for model in models:
+                print(f"  • {model}")
+        else:
+            print("📁 Кастомные модели не найдены")
+        
+        return models
     
     def download_pyannote_model(self, hf_token: str, model_name: str = "pyannote/speaker-diarization-3.1"):
         """Скачивание модели PyAnnote"""
@@ -100,8 +191,20 @@ class ModelDownloader:
               help='Пропустить скачивание моделей Whisper')
 @click.option('--skip-pyannote', is_flag=True,
               help='Пропустить скачивание модели PyAnnote')
+@click.option('--custom-whisper-model', 
+              help='ID кастомной модели Whisper для скачивания (например, antony66/whisper-large-v3-russian)')
+@click.option('--custom-model-name',
+              help='Локальное имя для кастомной модели (по умолчанию из ID)')
+@click.option('--copy-local-model',
+              help='Путь к локальной кастомной модели для копирования в кеш')
+@click.option('--local-model-name', default='whisper-large-v3-russian',
+              help='Имя для локальной модели при копировании')
+@click.option('--list-custom', is_flag=True,
+              help='Показать список кастомных моделей в кеше')
 def main(hf_token: Optional[str], models_dir: str, whisper_models: str, 
-         skip_whisper: bool, skip_pyannote: bool):
+         skip_whisper: bool, skip_pyannote: bool, custom_whisper_model: Optional[str],
+         custom_model_name: Optional[str], copy_local_model: Optional[str],
+         local_model_name: str, list_custom: bool):
     """
     Скачивание моделей для офлайн использования
     """
@@ -110,6 +213,33 @@ def main(hf_token: Optional[str], models_dir: str, whisper_models: str,
     print(f"📁 Директория: {models_dir}")
     
     downloader = ModelDownloader(models_dir)
+    
+    # Показать список кастомных моделей
+    if list_custom:
+        downloader.list_custom_models()
+        return
+    
+    # Копирование локальной кастомной модели
+    if copy_local_model:
+        success = downloader.copy_local_custom_model(copy_local_model, local_model_name)
+        if success:
+            print(f"\n✅ Локальная модель скопирована!")
+            print(f"💡 Используйте: python main.py input.wav --custom-model {models_dir}/custom_whisper/{local_model_name}")
+        return
+    
+    # Скачивание кастомной модели Whisper
+    if custom_whisper_model:
+        if not HF_TRANSFORMERS_AVAILABLE:
+            print("❌ Для кастомных моделей нужна библиотека transformers")
+            print("💡 Установите: pip install transformers")
+            sys.exit(1)
+        
+        success = downloader.download_custom_whisper_model(custom_whisper_model, custom_model_name)
+        if success:
+            model_name = custom_model_name or custom_whisper_model.replace("/", "_")
+            print(f"\n✅ Кастомная модель скачана!")
+            print(f"💡 Используйте: python main.py input.wav --custom-model {models_dir}/custom_whisper/{model_name}")
+        return
     
     # Скачиваем модели Whisper
     if not skip_whisper:
@@ -141,6 +271,10 @@ def main(hf_token: Optional[str], models_dir: str, whisper_models: str,
     print(f"python main.py input/audio.wav --local-models {models_dir}")
     print("\n💡 Или установите переменную среды:")
     print(f"export LOCAL_MODELS_DIR={models_dir}")
+    
+    # Показываем доступные кастомные модели
+    print("\n📋 Доступные кастомные модели:")
+    downloader.list_custom_models()
 
 
 if __name__ == "__main__":

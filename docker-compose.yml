@@ -1,20 +1,75 @@
 version: '3.8'
 
 services:
+  # NVIDIA GPU version
+  whisper-diarization-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whisper-pipeline-gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./input:/app/input:ro
+      - ./output:/app/output
+      - ./models:/app/models
+      - ./.env:/app/.env:ro
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - LOCAL_MODELS_DIR=/app/models
+    profiles:
+      - gpu
+    stdin_open: true
+    tty: true
+
+  # CPU-only version
+  whisper-diarization-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    container_name: whisper-pipeline-cpu
+    volumes:
+      - ./input:/app/input:ro
+      - ./output:/app/output
+      - ./models:/app/models
+      - ./.env:/app/.env:ro
+    environment:
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - LOCAL_MODELS_DIR=/app/models
+    profiles:
+      - cpu
+    stdin_open: true
+    tty: true
+
+  # Default service (auto-detect)
   whisper-diarization:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: whisper-pipeline
     volumes:
-      # Монтируем локальную папку input в контейнер
-      - ./input:/app/input
-      # Монтируем локальную папку output в контейнер  
+      - ./input:/app/input:ro
       - ./output:/app/output
+      - ./models:/app/models
+      - ./.env:/app/.env:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     environment:
-      # HuggingFace токен (установите в .env файле или передайте через переменную среды)
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
-    # Пример команды для запуска
-    # command: ["/app/input/audio.wav", "--model", "base", "--output", "/app/output"]
-    
-    # Для интерактивного режима
+      - LOCAL_MODELS_DIR=/app/models
     stdin_open: true
     tty: true 

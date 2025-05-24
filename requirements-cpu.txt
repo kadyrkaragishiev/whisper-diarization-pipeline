@@ -1,7 +1,6 @@
-# PyTorch with CUDA support for NVIDIA GPUs
+# PyTorch CPU-only version
 torch>=2.1.0,<3.0.0
 torchaudio>=2.1.0,<3.0.0
---extra-index-url https://download.pytorch.org/whl/cu121
 
 # Whisper and audio processing
 openai-whisper>=20231117
@@ -25,4 +24,4 @@ click>=8.0.0
 tqdm>=4.65.0
 
 # Audio codecs
-ffmpeg-python>=0.2.0
+ffmpeg-python>=0.2.0 
