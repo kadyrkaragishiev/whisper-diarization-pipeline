@@ -1,5 +1,5 @@
 # Complete Whisper Diarization Pipeline Setup for Windows
-# Полная автоматическая установка системы на Windows
+# Full automatic system installation on Windows
 
 param(
     [switch]$Force,
@@ -30,36 +30,36 @@ function Write-ColorOutput {
 Write-ColorOutput "Whisper Diarization Pipeline - Complete Setup" "Purple"
 Write-ColorOutput "=================================================" "Purple"
 Write-Host ""
-Write-ColorOutput "Этот скрипт автоматически установит:" "Blue"
-Write-ColorOutput "• WSL2 (если нужно)" "Blue"  
+Write-ColorOutput "This script will automatically install:" "Blue"
+Write-ColorOutput "• WSL2 (if needed)" "Blue"  
 Write-ColorOutput "• Docker Desktop" "Blue"
-Write-ColorOutput "• NVIDIA GPU поддержку (если доступно)" "Blue"
-Write-ColorOutput "• Соберет Docker образы" "Blue"
-Write-ColorOutput "• Настроит окружение" "Blue"
+Write-ColorOutput "• NVIDIA GPU support (if available)" "Blue"
+Write-ColorOutput "• Build Docker images" "Blue"
+Write-ColorOutput "• Setup environment" "Blue"
 Write-Host ""
 
 # Ask for confirmation
 if (-not $Force) {
-    $continue = Read-Host "Продолжить установку? (y/N)"
+    $continue = Read-Host "Continue with installation? (y/N)"
     if ($continue -ne "y" -and $continue -ne "Y") {
-        Write-ColorOutput "Установка отменена" "Yellow"
+        Write-ColorOutput "Installation cancelled" "Yellow"
         exit 0
     }
 }
 
-Write-ColorOutput "Начинаем установку..." "Blue"
+Write-ColorOutput "Starting installation..." "Blue"
 
 # Check administrator privileges
 if (-not (Test-Administrator)) {
-    Write-ColorOutput "Требуются права администратора" "Red"
-    Write-ColorOutput "Запустите PowerShell как администратор и попробуйте снова" "Yellow"
+    Write-ColorOutput "Administrator privileges required" "Red"
+    Write-ColorOutput "Run PowerShell as Administrator and try again" "Yellow"
     exit 1
 }
 
 # Step 1: Install dependencies via PowerShell script
-Write-ColorOutput "Шаг 1: Установка зависимостей..." "Blue"
+Write-ColorOutput "Step 1: Installing dependencies..." "Blue"
 if (Test-Path "install-docker.ps1") {
-    Write-ColorOutput "Запускаем install-docker.ps1..." "Blue"
+    Write-ColorOutput "Running install-docker.ps1..." "Blue"
     $installArgs = @()
     if ($Force) { $installArgs += "-Force" }
     if ($SkipNvidia) { $installArgs += "-SkipNvidia" }
@@ -71,87 +71,87 @@ if (Test-Path "install-docker.ps1") {
             & ".\install-docker.ps1"
         }
     } catch {
-        Write-ColorOutput "Ошибка установки зависимостей" "Red"
-        Write-ColorOutput "Попробуйте установить Docker Desktop вручную" "Yellow"
+        Write-ColorOutput "Error installing dependencies" "Red"
+        Write-ColorOutput "Try installing Docker Desktop manually" "Yellow"
     }
 } else {
-    Write-ColorOutput "Файл install-docker.ps1 не найден" "Red"
-    Write-ColorOutput "Скачайте Docker Desktop: https://www.docker.com/products/docker-desktop" "Yellow"
+    Write-ColorOutput "File install-docker.ps1 not found" "Red"
+    Write-ColorOutput "Download Docker Desktop: https://www.docker.com/products/docker-desktop" "Yellow"
 }
 
 # Step 2: Create directories
-Write-ColorOutput "Шаг 2: Создание директорий..." "Blue"
+Write-ColorOutput "Step 2: Creating directories..." "Blue"
 $dirs = @("input", "output", "models")
 foreach ($dir in $dirs) {
     if (-not (Test-Path $dir)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
-        Write-ColorOutput "Создана директория: $dir" "Green"
+        Write-ColorOutput "Created directory: $dir" "Green"
     }
 }
 
 # Step 3: Setup environment
-Write-ColorOutput "Шаг 3: Настройка окружения..." "Blue"
+Write-ColorOutput "Step 3: Setting up environment..." "Blue"
 if (-not (Test-Path ".env")) {
     if (Test-Path "env.example") {
         Copy-Item "env.example" ".env"
-        Write-ColorOutput "Создан файл .env из шаблона" "Green"
-        Write-ColorOutput "Отредактируйте .env и добавьте HUGGINGFACE_TOKEN если нужно" "Yellow"
+        Write-ColorOutput "Created .env file from template" "Green"
+        Write-ColorOutput "Edit .env and add HUGGINGFACE_TOKEN if needed" "Yellow"
     }
 } else {
-    Write-ColorOutput "Файл .env уже существует" "Green"
+    Write-ColorOutput ".env file already exists" "Green"
 }
 
 # Step 4: Test Docker
-Write-ColorOutput "Шаг 4: Проверка Docker..." "Blue"
+Write-ColorOutput "Step 4: Testing Docker..." "Blue"
 $dockerWorking = $false
 try {
     docker run --rm hello-world | Out-Null
-    Write-ColorOutput "Docker работает корректно" "Green"
+    Write-ColorOutput "Docker working correctly" "Green"
     $dockerWorking = $true
 } catch {
-    Write-ColorOutput "Проблемы с Docker" "Red"
-    Write-ColorOutput "Убедитесь что Docker Desktop запущен" "Yellow"
-    Write-ColorOutput "Возможно нужна перезагрузка" "Yellow"
+    Write-ColorOutput "Docker issues detected" "Red"
+    Write-ColorOutput "Make sure Docker Desktop is running" "Yellow"
+    Write-ColorOutput "You may need to reboot" "Yellow"
 }
 
 # Step 5: Check GPU support
-Write-ColorOutput "Шаг 5: Проверка GPU поддержки..." "Blue"
+Write-ColorOutput "Step 5: Checking GPU support..." "Blue"
 $gpuAvailable = $false
 
 if (-not $SkipNvidia) {
     try {
         nvidia-smi | Out-Null
-        Write-ColorOutput "NVIDIA GPU обнаружена" "Green"
+        Write-ColorOutput "NVIDIA GPU detected" "Green"
         
         if ($dockerWorking) {
             try {
                 $dockerInfo = docker info 2>$null | Out-String
                 if ($dockerInfo -match "nvidia") {
-                    Write-ColorOutput "NVIDIA Docker runtime доступен" "Green"
+                    Write-ColorOutput "NVIDIA Docker runtime available" "Green"
                     $gpuAvailable = $true
                 } else {
-                    Write-ColorOutput "NVIDIA Docker runtime не настроен" "Yellow"
-                    Write-ColorOutput "Docker Desktop автоматически поддерживает NVIDIA GPU" "Yellow"
+                    Write-ColorOutput "NVIDIA Docker runtime not configured" "Yellow"
+                    Write-ColorOutput "Docker Desktop automatically supports NVIDIA GPU" "Yellow"
                 }
             } catch {
-                Write-ColorOutput "Не удалось проверить Docker info" "Yellow"
+                Write-ColorOutput "Could not check Docker info" "Yellow"
             }
         }
     } catch {
-        Write-ColorOutput "NVIDIA GPU не обнаружена" "Yellow"
-        Write-ColorOutput "Установите NVIDIA драйверы для GPU ускорения" "Yellow"
+        Write-ColorOutput "NVIDIA GPU not detected" "Yellow"
+        Write-ColorOutput "Install NVIDIA drivers for GPU acceleration" "Yellow"
     }
 }
 
 # Step 6: Build Docker images
 if ($dockerWorking) {
-    Write-ColorOutput "Шаг 6: Сборка Docker образов..." "Blue"
+    Write-ColorOutput "Step 6: Building Docker images..." "Blue"
     
     $profile = if ($gpuAvailable) { "gpu" } else { "cpu" }
     $service = if ($gpuAvailable) { "whisper-diarization-gpu" } else { "whisper-diarization-cpu" }
     $version = if ($gpuAvailable) { "GPU" } else { "CPU" }
     
-    Write-ColorOutput "Собираем $version версию..." $(if ($gpuAvailable) { "Green" } else { "Yellow" })
+    Write-ColorOutput "Building $version version..." $(if ($gpuAvailable) { "Green" } else { "Yellow" })
     
     try {
         $composeCommand = "docker compose"
@@ -165,58 +165,58 @@ if ($dockerWorking) {
             & docker compose --profile $profile build $service
         }
         
-        Write-ColorOutput "Docker образ собран успешно" "Green"
+        Write-ColorOutput "Docker image built successfully" "Green"
     } catch {
-        Write-ColorOutput "Ошибка сборки Docker образа" "Red"
-        Write-ColorOutput "Проверьте интернет соединение" "Yellow"
+        Write-ColorOutput "Error building Docker image" "Red"
+        Write-ColorOutput "Check internet connection" "Yellow"
     }
 } else {
-    Write-ColorOutput "Пропускаем сборку - Docker не работает" "Yellow"
+    Write-ColorOutput "Skipping build - Docker not working" "Yellow"
 }
 
 # Step 7: Test the pipeline
 if ($dockerWorking) {
-    Write-ColorOutput "Шаг 7: Тестирование системы..." "Blue"
-    Write-ColorOutput "Показываем справку..." "Blue"
+    Write-ColorOutput "Step 7: Testing system..." "Blue"
+    Write-ColorOutput "Showing help..." "Blue"
     
     try {
         if (Test-Path "run.ps1") {
             & ".\run.ps1" -Help
         } else {
-            Write-ColorOutput "Используйте run.ps1 для запуска или run.sh в WSL/Git Bash" "Yellow"
+            Write-ColorOutput "Use run.ps1 for launch or run.sh in WSL/Git Bash" "Yellow"
         }
     } catch {
-        Write-ColorOutput "Не удалось показать справку" "Yellow"
+        Write-ColorOutput "Could not show help" "Yellow"
     }
 }
 
 # Final results
 Write-Host ""
-Write-ColorOutput "Установка завершена!" "Green"
+Write-ColorOutput "Installation completed!" "Green"
 Write-Host ""
-Write-ColorOutput "Что дальше:" "Purple"
+Write-ColorOutput "Next steps:" "Purple"
 Write-Host ""
-Write-ColorOutput "1. Поместите аудиофайл в директорию input:" "Blue"
+Write-ColorOutput "1. Place audio file in input directory:" "Blue"
 Write-ColorOutput "   copy your_audio.wav input\" "Green"
 Write-Host ""
-Write-ColorOutput "2. Запустите обработку:" "Blue"
+Write-ColorOutput "2. Run processing:" "Blue"
 Write-ColorOutput "   .\run.ps1 your_audio.wav                    # PowerShell" "Green"
-Write-ColorOutput "   или ./run.sh your_audio.wav в WSL/Git Bash  # Bash" "Green"
+Write-ColorOutput "   or ./run.sh your_audio.wav in WSL/Git Bash  # Bash" "Green"
 Write-Host ""
-Write-ColorOutput "3. Результаты будут в директории output\" "Blue"
+Write-ColorOutput "3. Results will be in output\" "Blue"
 Write-Host ""
 
 if ($gpuAvailable) {
-    Write-ColorOutput "Рекомендуемая версия: GPU (RTX 3080 обнаружена!)" "Green"
+    Write-ColorOutput "Recommended version: GPU (RTX 3080 detected!)" "Green"
 } else {
-    Write-ColorOutput "Рекомендуемая версия: CPU" "Yellow"
+    Write-ColorOutput "Recommended version: CPU" "Yellow"
     if (-not $SkipNvidia) {
-        Write-ColorOutput "Для GPU ускорения установите NVIDIA драйверы" "Yellow"
+        Write-ColorOutput "Install NVIDIA drivers for GPU acceleration" "Yellow"
     }
 }
 
 Write-Host ""
-Write-ColorOutput "Подробная документация: README.md" "Blue"
-Write-ColorOutput "Проблемы? Проверьте INSTALLATION.md" "Blue"
+Write-ColorOutput "Documentation: README.md" "Blue"
+Write-ColorOutput "Issues? Check INSTALLATION.md" "Blue"
 Write-Host ""
-Write-ColorOutput "Готово к использованию!" "Purple" 
+Write-ColorOutput "Ready to use!" "Purple" 

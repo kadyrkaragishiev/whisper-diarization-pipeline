@@ -8,84 +8,84 @@ echo  Whisper Diarization Pipeline - Windows Setup
 echo =====================================================
 echo.
 
-echo Этот скрипт поможет настроить систему на Windows.
+echo This script will help set up the system on Windows.
 echo.
 
 REM Check if running as administrator
 net session >nul 2>&1
 if %errorLevel% neq 0 (
-    echo Требуются права администратора.
+    echo Administrator privileges required.
     echo.
-    echo 1. Щелкните правой кнопкой мыши на этом файле
-    echo 2. Выберите "Запуск от имени администратора"
+    echo 1. Right-click on this file
+    echo 2. Select "Run as administrator"
     echo.
     pause
     exit /b 1
 )
 
-echo Проверяем PowerShell...
+echo Checking PowerShell...
 powershell -Command "Get-Host" >nul 2>&1
 if errorlevel 1 (
-    echo PowerShell не найден. Обновите Windows.
+    echo PowerShell not found. Update Windows.
     pause
     exit /b 1
 )
 
 echo.
-echo Выберите способ установки:
+echo Choose installation method:
 echo.
-echo 1. Автоматическая установка (PowerShell)
-echo 2. Скачать Docker Desktop вручную
-echo 3. Показать инструкции
+echo 1. Automatic installation (PowerShell)
+echo 2. Download Docker Desktop manually
+echo 3. Show instructions
 echo.
 
-set /p choice="Ваш выбор (1-3): "
+set /p choice="Your choice (1-3): "
 
 if "%choice%"=="1" goto auto_install
 if "%choice%"=="2" goto manual_install
 if "%choice%"=="3" goto show_instructions
 
-echo Неверный выбор.
+echo Invalid choice.
 pause
 exit /b 1
 
 :auto_install
 echo.
-echo Запускаем автоматическую установку...
+echo Running automatic installation...
 echo.
 powershell -ExecutionPolicy Bypass -File setup-complete.ps1
 goto end
 
 :manual_install
 echo.
-echo Ручная установка:
+echo Manual installation:
 echo.
-echo 1. Скачайте Docker Desktop:
+echo 1. Download Docker Desktop:
 echo    https://www.docker.com/products/docker-desktop
 echo.
-echo 2. Установите и перезагрузите компьютер
+echo 2. Install and reboot computer
 echo.
-echo 3. Запустите Docker Desktop
+echo 3. Start Docker Desktop
 echo.
-echo 4. Поместите аудиофайл в папку input\
+echo 4. Place audio file in input\ folder
 echo.
-echo 5. Запустите: run.bat your_audio.wav
+echo 5. Run: run.bat your_audio.wav
 echo.
 start https://www.docker.com/products/docker-desktop
 goto end
 
 :show_instructions
 echo.
-echo Быстрый старт:
+echo Quick start:
 echo.
-echo 1. Этот скрипт установит Docker и WSL2
-echo 2. Автоматически настроит NVIDIA GPU (если есть)
-echo 3. Соберет Docker образы
-echo 4. Система будет готова к использованию
+echo 1. This script will install Docker and WSL2
+echo 2. Automatically configure NVIDIA GPU (if available)
+echo 3. Build Docker images
+echo 4. System will be ready to use
 echo.
-echo Для RTX 3080: получите 10-20x ускорение!
+echo For RTX 3080: get 10-20x acceleration!
 echo.
-echo После установки:
+echo After installation:
 echo   copy audio.wav input\
 echo   run.bat audio.wav
 echo.
@@ -93,11 +93,11 @@ goto :eof
 
 :end
 echo.
-echo Готово! Система настроена.
+echo Done! System configured.
 echo.
-echo Следующие шаги:
-echo 1. Поместите аудиофайл: copy audio.wav input\
-echo 2. Запустите: run.bat audio.wav
-echo 3. Результаты в: output\
+echo Next steps:
+echo 1. Place audio file: copy audio.wav input\
+echo 2. Run: run.bat audio.wav
+echo 3. Results in: output\
 echo.
 pause 

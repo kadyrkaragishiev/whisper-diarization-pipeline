@@ -1,33 +1,33 @@
 WHISPER DIARIZATION PIPELINE - WINDOWS
 =====================================
 
-БЫСТРЫЙ СТАРТ:
-1. Двойной клик на WINDOWS-SETUP.bat
-2. Выберите "Запуск от имени администратора"
-3. Следуйте инструкциям
+QUICK START:
+1. Double click on WINDOWS-SETUP.bat
+2. Select "Run as administrator"
+3. Follow the instructions
 
-АЛЬТЕРНАТИВА (PowerShell):
-1. Откройте PowerShell как администратор
-2. Выполните: .\setup-complete.ps1
-3. Следуйте инструкциям
+ALTERNATIVE (PowerShell):
+1. Open PowerShell as administrator
+2. Run: .\setup-complete.ps1
+3. Follow the instructions
 
-ИСПОЛЬЗОВАНИЕ:
-1. Поместите аудиофайл: copy audio.wav input\
-2. Запустите: run.bat audio.wav
-3. Результаты в: output\
+USAGE:
+1. Place audio file: copy audio.wav input\
+2. Run: run.bat audio.wav
+3. Results in: output\
 
-СИСТЕМА ПОДДЕРЖИВАЕТ:
-- Автоматическое определение NVIDIA GPU (RTX 3080)
-- CPU версия для систем без GPU
-- Все популярные аудио форматы
-- Автоматическая диаризация спикеров
+SYSTEM SUPPORTS:
+- Automatic NVIDIA GPU detection (RTX 3080)
+- CPU version for systems without GPU
+- All popular audio formats
+- Automatic speaker diarization
 
-ПРОБЛЕМЫ С КОДИРОВКОЙ?
-Используйте WINDOWS-SETUP.bat вместо PowerShell скриптов
+ENCODING ISSUES?
+Use WINDOWS-SETUP.bat instead of PowerShell scripts
 
-RTX 3080 УСКОРЕНИЕ:
-- CPU: 30-60 минут для 1 часа аудио
-- RTX 3080: 3-5 минут для 1 часа аудио
+RTX 3080 ACCELERATION:
+- CPU: 30-60 minutes for 1 hour audio
+- RTX 3080: 3-5 minutes for 1 hour audio
 
-КОНТАКТЫ:
-GitHub Issues для поддержки 
+SUPPORT:
+GitHub Issues for support 

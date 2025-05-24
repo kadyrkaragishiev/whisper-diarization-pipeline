@@ -34,8 +34,8 @@ Write-ColorOutput "================================" "Blue"
 
 # Check if Docker is installed
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-ColorOutput "Docker не установлен. Установите Docker Desktop и попробуйте снова." "Red"
-    Write-ColorOutput "Запустите: PowerShell -ExecutionPolicy Bypass -File install-docker.ps1" "Yellow"
+    Write-ColorOutput "Docker not installed. Install Docker Desktop and try again." "Red"
+    Write-ColorOutput "Run: PowerShell -ExecutionPolicy Bypass -File install-docker.ps1" "Yellow"
     exit 1
 }
 
@@ -43,7 +43,7 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 try {
     docker version | Out-Null
 } catch {
-    Write-ColorOutput "Docker не запущен. Запустите Docker Desktop и попробуйте снова." "Red"
+    Write-ColorOutput "Docker not running. Start Docker Desktop and try again." "Red"
     exit 1
 }
 
@@ -58,7 +58,7 @@ if (Get-Command docker-compose -ErrorAction SilentlyContinue) {
 }
 
 if (-not $dockerComposeAvailable) {
-    Write-ColorOutput "Docker Compose не найден. Обновите Docker Desktop." "Red"
+    Write-ColorOutput "Docker Compose not found. Update Docker Desktop." "Red"
     exit 1
 }
 
@@ -83,7 +83,7 @@ function Test-NvidiaDocker {
 }
 
 # Create necessary directories
-Write-ColorOutput "📁 Создаем необходимые директории..." "Blue"
+Write-ColorOutput "Creating necessary directories..." "Blue"
 $dirs = @("input", "output", "models")
 foreach ($dir in $dirs) {
     if (-not (Test-Path $dir)) {
@@ -93,10 +93,10 @@ foreach ($dir in $dirs) {
 
 # Create .env file if it doesn't exist
 if (-not (Test-Path ".env")) {
-    Write-ColorOutput "📝 Создаем .env файл..." "Blue"
+    Write-ColorOutput "Creating .env file..." "Blue"
     if (Test-Path "env.example") {
         Copy-Item "env.example" ".env"
-        Write-ColorOutput "💡 Отредактируйте .env файл и добавьте ваш HUGGINGFACE_TOKEN если нужно" "Yellow"
+        Write-ColorOutput "Edit .env file and add your HUGGINGFACE_TOKEN if needed" "Yellow"
     }
 }
 
@@ -106,25 +106,25 @@ $profile = "cpu"
 $service = "whisper-diarization-cpu"
 
 if (Test-NvidiaGPU) {
-    Write-ColorOutput "✅ NVIDIA GPU обнаружена" "Green"
+    Write-ColorOutput "NVIDIA GPU detected" "Green"
     
     if (Test-NvidiaDocker) {
-        Write-ColorOutput "✅ NVIDIA Docker runtime доступен" "Green"
+        Write-ColorOutput "NVIDIA Docker runtime available" "Green"
         $useGPU = $true
         $profile = "gpu"
         $service = "whisper-diarization-gpu"
-        Write-ColorOutput "🚀 Запускаем GPU версию" "Green"
+        Write-ColorOutput "Running GPU version" "Green"
     } else {
-        Write-ColorOutput "⚠️  NVIDIA Docker runtime не найден" "Yellow"
-        Write-ColorOutput "🚀 Запускаем CPU версию" "Yellow"
+        Write-ColorOutput "NVIDIA Docker runtime not found" "Yellow"
+        Write-ColorOutput "Running CPU version" "Yellow"
     }
 } else {
-    Write-ColorOutput "⚠️  NVIDIA GPU не обнаружена или драйверы не установлены" "Yellow"
-    Write-ColorOutput "🚀 Запускаем CPU версию" "Yellow"
+    Write-ColorOutput "NVIDIA GPU not detected or drivers not installed" "Yellow"
+    Write-ColorOutput "Running CPU version" "Yellow"
 }
 
 # Build the image
-Write-ColorOutput "🔨 Собираем Docker образ..." "Blue"
+Write-ColorOutput "Building Docker image..." "Blue"
 try {
     if ($composeCommand -eq "docker-compose") {
         & docker-compose --profile $profile build $service
@@ -132,14 +132,14 @@ try {
         & docker compose --profile $profile build $service
     }
 } catch {
-    Write-ColorOutput "❌ Ошибка сборки образа" "Red"
-    Write-ColorOutput "💡 Проверьте интернет соединение и Docker" "Yellow"
+    Write-ColorOutput "Error building image" "Red"
+    Write-ColorOutput "Check internet connection and Docker" "Yellow"
     exit 1
 }
 
 # Function to show help
 function Show-Help {
-    Write-ColorOutput "📖 Показываем справку..." "Blue"
+    Write-ColorOutput "Showing help..." "Blue"
     
     if ($composeCommand -eq "docker-compose") {
         & docker-compose --profile $profile run --rm $service --help
@@ -148,14 +148,14 @@ function Show-Help {
     }
     
     Write-Host ""
-    Write-ColorOutput "Примеры использования:" "Yellow"
-    Write-ColorOutput "  .\run.ps1 audio.wav                           # Базовая обработка" "Green"
-    Write-ColorOutput "  .\run.ps1 audio.wav -Model large             # Использовать большую модель" "Green"
-    Write-ColorOutput "  .\run.ps1 audio.wav -MaxSpeakers 5           # Максимум 5 спикеров" "Green"
-    Write-ColorOutput "  .\run.ps1 audio.wav -CustomModel path/model  # Кастомная модель" "Green"
+    Write-ColorOutput "Usage examples:" "Yellow"
+    Write-ColorOutput "  .\run.ps1 audio.wav                           # Basic processing" "Green"
+    Write-ColorOutput "  .\run.ps1 audio.wav -Model large             # Use large model" "Green"
+    Write-ColorOutput "  .\run.ps1 audio.wav -MaxSpeakers 5           # Maximum 5 speakers" "Green"
+    Write-ColorOutput "  .\run.ps1 audio.wav -CustomModel path/model  # Custom model" "Green"
     Write-Host ""
-    Write-ColorOutput "💡 Поместите аудиофайлы в директорию input\" "Blue"
-    Write-ColorOutput "📁 Результаты будут сохранены в директории output\" "Blue"
+    Write-ColorOutput "Place audio files in input\ directory" "Blue"
+    Write-ColorOutput "Results will be saved in output\ directory" "Blue"
 }
 
 # Function to run the pipeline
@@ -164,12 +164,12 @@ function Start-Pipeline {
     
     $inputPath = "input\$AudioFile"
     if (-not (Test-Path $inputPath)) {
-        Write-ColorOutput "❌ Файл $inputPath не найден" "Red"
-        Write-ColorOutput "💡 Поместите аудиофайл в директорию input\" "Yellow"
+        Write-ColorOutput "File $inputPath not found" "Red"
+        Write-ColorOutput "Place audio file in input\ directory" "Yellow"
         exit 1
     }
     
-    Write-ColorOutput "🎵 Обрабатываем: $AudioFile" "Green"
+    Write-ColorOutput "Processing: $AudioFile" "Green"
     
     # Build docker run arguments
     $dockerArgs = @($AudioFile)
@@ -182,7 +182,7 @@ function Start-Pipeline {
             & docker compose --profile $profile run --rm $service @dockerArgs
         }
     } catch {
-        Write-ColorOutput "❌ Ошибка выполнения" "Red"
+        Write-ColorOutput "Execution error" "Red"
         exit 1
     }
 }
